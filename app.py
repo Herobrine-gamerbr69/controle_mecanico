@@ -2,10 +2,17 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 import sqlite3
 
-# ==== Função para criar o banco de dados ====
+# ==== CRIAR BANCO E TABELAS ====
 def criar_banco():
     conexao = sqlite3.connect("banco.db")
     cursor = conexao.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario TEXT NOT NULL UNIQUE,
+            senha TEXT NOT NULL
+        )
+    """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS servicos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,17 +24,62 @@ def criar_banco():
     conexao.commit()
     conexao.close()
 
-# ==== Função para login ====
+# ==== CADASTRAR NOVO USUÁRIO ====
+def cadastrar_usuario():
+    usuario = entrada_novo_usuario.get()
+    senha = entrada_nova_senha.get()
+
+    if not usuario or not senha:
+        messagebox.showwarning("Atenção", "Preencha todos os campos!")
+        return
+
+    conexao = sqlite3.connect("banco.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute("INSERT INTO usuarios (usuario, senha) VALUES (?, ?)", (usuario, senha))
+        conexao.commit()
+        messagebox.showinfo("Sucesso", "Usuário cadastrado com sucesso!")
+        tela_cadastro.destroy()
+    except sqlite3.IntegrityError:
+        messagebox.showerror("Erro", "Usuário já existe!")
+    finally:
+        conexao.close()
+
+# ==== ABRIR TELA DE CADASTRO ====
+def abrir_tela_cadastro():
+    global tela_cadastro, entrada_novo_usuario, entrada_nova_senha
+    tela_cadastro = tk.Toplevel()
+    tela_cadastro.title("Cadastro de Novo Usuário")
+    tela_cadastro.geometry("300x150")
+
+    tk.Label(tela_cadastro, text="Novo Usuário:").pack()
+    entrada_novo_usuario = tk.Entry(tela_cadastro)
+    entrada_novo_usuario.pack()
+
+    tk.Label(tela_cadastro, text="Nova Senha:").pack()
+    entrada_nova_senha = tk.Entry(tela_cadastro, show="*")
+    entrada_nova_senha.pack()
+
+    tk.Button(tela_cadastro, text="Cadastrar", command=cadastrar_usuario).pack(pady=10)
+
+# ==== FAZER LOGIN ====
 def fazer_login():
     usuario = entrada_usuario.get()
     senha = entrada_senha.get()
-    if usuario == "admin" and senha == "admin123":
+
+    conexao = sqlite3.connect("banco.db")
+    cursor = conexao.cursor()
+    cursor.execute("SELECT * FROM usuarios WHERE usuario = ? AND senha = ?", (usuario, senha))
+    resultado = cursor.fetchone()
+    conexao.close()
+
+    if resultado:
         janela_login.destroy()
         abrir_sistema()
     else:
         messagebox.showerror("Erro", "Usuário ou senha incorretos")
 
-# ==== Função para cadastrar serviço ====
+# ==== CADASTRAR SERVIÇO ====
 def cadastrar_servico():
     nome = entrada_nome.get()
     servico = entrada_servico.get()
@@ -48,7 +100,7 @@ def cadastrar_servico():
     entrada_servico.delete(0, tk.END)
     entrada_carro.delete(0, tk.END)
 
-# ==== Função para listar serviços ====
+# ==== LISTAR SERVIÇOS ====
 def listar_servicos():
     for item in tabela.get_children():
         tabela.delete(item)
@@ -59,7 +111,7 @@ def listar_servicos():
         tabela.insert("", "end", values=row)
     conexao.close()
 
-# ==== Função para excluir serviço ====
+# ==== EXCLUIR SERVIÇO ====
 def excluir_servico():
     item_selecionado = tabela.selection()
     if not item_selecionado:
@@ -75,7 +127,7 @@ def excluir_servico():
     conexao.close()
     listar_servicos()
 
-# ==== Interface principal ====
+# ==== ABRIR SISTEMA PRINCIPAL ====
 def abrir_sistema():
     global entrada_nome, entrada_servico, entrada_carro, tabela
 
@@ -83,7 +135,6 @@ def abrir_sistema():
     janela.title("Controle de Serviços do Mecânico")
     janela.geometry("600x400")
 
-    # Campos de entrada
     tk.Label(janela, text="Nome do Cliente").grid(row=0, column=0)
     entrada_nome = tk.Entry(janela)
     entrada_nome.grid(row=0, column=1)
@@ -98,7 +149,6 @@ def abrir_sistema():
 
     tk.Button(janela, text="Cadastrar Serviço", command=cadastrar_servico).grid(row=3, column=0, columnspan=2, pady=10)
 
-    # Tabela de serviços
     tabela = ttk.Treeview(janela, columns=("ID", "Cliente", "Serviço", "Carro"), show="headings")
     tabela.heading("ID", text="ID")
     tabela.heading("Cliente", text="Cliente")
@@ -111,11 +161,12 @@ def abrir_sistema():
     listar_servicos()
     janela.mainloop()
 
-# ==== Interface de login ====
+# ==== INICIAR APLICAÇÃO ====
 criar_banco()
+
 janela_login = tk.Tk()
 janela_login.title("Login")
-janela_login.geometry("300x150")
+janela_login.geometry("300x200")
 
 tk.Label(janela_login, text="Usuário:").pack()
 entrada_usuario = tk.Entry(janela_login)
@@ -125,6 +176,8 @@ tk.Label(janela_login, text="Senha:").pack()
 entrada_senha = tk.Entry(janela_login, show="*")
 entrada_senha.pack()
 
-tk.Button(janela_login, text="Entrar", command=fazer_login).pack(pady=10)
+tk.Button(janela_login, text="Entrar", command=fazer_login).pack(pady=5)
+tk.Button(janela_login, text="Cadastrar Novo Usuário", command=abrir_tela_cadastro).pack()
 
 janela_login.mainloop()
+
